@@ -15,6 +15,7 @@ RUN pip3 install -r requirements.txt
 
 RUN apt-get update
 RUN apt-get -y install libgl1-mesa-glx
+RUN apt-get -y install libglib2.0-0 -y
 
 # USER 변경은 반드시 pip 패키지 설치 스크립트 이후에 작성되어야 함
 USER python:python
