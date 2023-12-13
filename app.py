@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-# import cv2 as cv
+import cv2 as cv
 
 app = Flask(__name__)
 
