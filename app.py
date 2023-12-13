@@ -10,7 +10,7 @@ def index():
 @app.route('/match', methods=['POST'])
 def match_images():
     try:
-	data = request.get_json()
+        data = request.get_json()
         # Get image data and template data from the request
         screen_image = data.get('screen_image', '')
         target_image = data.get('target_image', '')
