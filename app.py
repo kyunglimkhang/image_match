@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
 import cv2 as cv
+import base64
+import numpy as np
 
 app = Flask(__name__)
 
@@ -11,12 +13,17 @@ def index():
 def match_images():
     try:
         data = request.get_json()
-        # Get image data and template data from the request
-        screen_image = data.get('screen_image', '')
-        target_image = data.get('target_image', '')
 
-        if not screen_image or not target_image:
+        # Get base64-encoded image data from the request
+        screen_image_base64 = data.get('screen_image', '')
+        target_image_base64 = data.get('target_image', '')
+
+        if not screen_image_base64 or not target_image_base64:
             return jsonify({'error': 'Missing image or template data'})
+
+        # Decode base64-encoded images
+        screen_image = decode_base64_image(screen_image_base64)
+        target_image = decode_base64_image(target_image_base64)
 
         response = template_matching(screen_image, target_image)
 
@@ -25,17 +32,14 @@ def match_images():
     except Exception as e:
         return jsonify({'error': str(e)})
 
-def template_matching(screen_image, target_image):
-
-    screen = cv.imread(screen_image, cv.IMREAD_GRAYSCALE)          
-    target = cv.imread(target_image, cv.IMREAD_GRAYSCALE)          
+def template_matching(screen_image, target_image):        
 
     # Initiate SIFT detector
     sift = cv.SIFT_create()
 
     # find the keypoints and descriptors with SIFT
-    kp1, des1 = sift.detectAndCompute(target, None)
-    kp2, des2 = sift.detectAndCompute(screen, None)
+    kp1, des1 = sift.detectAndCompute(target_image, None)
+    kp2, des2 = sift.detectAndCompute(screen_image, None)
 
     # FLANN parameters
     FLANN_INDEX_KDTREE = 1
@@ -62,3 +66,18 @@ def template_matching(screen_image, target_image):
             'Template found': match_result,
             'good_matches': len(good_matches)
         })
+
+def decode_base64_image(encoded_image):
+    # Remove the data URL prefix (e.g., 'data:image/png;base64,')
+    encoded_image = encoded_image.split(',')[1]
+
+    # Decode base64 and convert to NumPy array
+    decoded_image = np.frombuffer(base64.b64decode(encoded_image), dtype=np.uint8)
+
+    # Decode the image using OpenCV
+    image = cv.imdecode(decoded_image, cv.IMREAD_GRAYSCALE)
+
+    return image
+
+if __name__ == '__main__':
+    app.run(debug=True)
