@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify
 import cv2 as cv
 import base64
 import numpy as np
+import requests
+from io import BytesIO
 
 app = Flask(__name__)
 
@@ -14,16 +16,16 @@ def match_images():
     try:
         data = request.get_json()
 
-        # Get base64-encoded image data from the request
-        screen_image_base64 = data.get('screen_image', '')
-        target_image_base64 = data.get('target_image', '')
+        # Get image URLs from the request
+        screen_image_url = data.get('screen_image', '')
+        target_image_url = data.get('target_image', '')
 
-        if not screen_image_base64 or not target_image_base64:
-            return jsonify({'error': 'Missing image or template data'})
+        if not screen_image_url or not target_image_url:
+            return jsonify({'error': 'Missing image URL'})
 
-        # Decode base64-encoded images
-        screen_image = decode_base64_image(screen_image_base64)
-        target_image = decode_base64_image(target_image_base64)
+        # Download images from URLs
+        screen_image = download_image(screen_image_url)
+        target_image = download_image(target_image_url)
 
         response = template_matching(screen_image, target_image)
 
@@ -61,23 +63,38 @@ def template_matching(screen_image, target_image):
 
     # Print and return the result
     match_result = len(good_matches) >= min_good_matches
+    
+    if (match_result):
+        # Need to draw only good matches, so create a mask
+        matchesMask = [[0,0] for i in range(len(matches))]
+
+        # ratio test as per Lowe's paper
+        for i,(m,n) in enumerate(matches):
+            if m.distance < 0.7*n.distance:
+                matchesMask[i]=[1,0]
+                
+        draw_params = dict(matchColor = (0,255,0),
+                        singlePointColor = (255,0,0),
+                        matchesMask = matchesMask,
+                        flags = cv.DrawMatchesFlags_DEFAULT)
+
+        img3 = cv.drawMatchesKnn(target_image, kp1, screen_image, kp2, matches, None, **draw_params)
 
     return jsonify({
             'Template found': match_result,
             'good_matches': len(good_matches)
         })
 
-def decode_base64_image(encoded_image):
-    # Remove the data URL prefix (e.g., 'data:image/png;base64,')
-    encoded_image = encoded_image.split(',')[1]
 
-    # Decode base64 and convert to NumPy array
-    decoded_image = np.frombuffer(base64.b64decode(encoded_image), dtype=np.uint8)
-
-    # Decode the image using OpenCV
-    image = cv.imdecode(decoded_image, cv.IMREAD_GRAYSCALE)
-
-    return image
+def download_image(image_url):
+    response = requests.get(image_url)
+    if response.status_code == 200:
+        # Read the image from the response content
+        image_data = BytesIO(response.content)
+        image = cv.imdecode(np.frombuffer(image_data.read(), np.uint8), cv.IMREAD_GRAYSCALE)
+        return image
+    else:
+        raise Exception(f"Failed to download image from URL: {image_url}")
 
 if __name__ == '__main__':
     app.run(debug=True)
