@@ -95,6 +95,3 @@ def download_image(image_url):
         return image
     else:
         raise Exception(f"Failed to download image from URL: {image_url}")
-
-if __name__ == '__main__':
-    app.run(debug=True)
